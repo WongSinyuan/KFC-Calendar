@@ -7,3 +7,15 @@ w
 G.idea/sonarlint/issuestore/4/9/496a238a6afa168dbaf6efd37bb459331589579c,6\e\6e9644ddf83ab52f39902ecdbfdf4118285ac40c
 w
 G.idea/sonarlint/issuestore/1/e/1e9075f5bf079c01ef2c910709e91a497d262080,2\5\2511a7590eb091d560dac1615e6bcef0ceeaffb6
+w
+G.idea/sonarlint/issuestore/6/e/6e9644ddf83ab52f39902ecdbfdf4118285ac40c,4\2\4291a6ab95c696f29dcedea66516b99a0fd0f28a
+w
+G.idea/sonarlint/issuestore/2/5/2511a7590eb091d560dac1615e6bcef0ceeaffb6,1\8\18214068b58c1008534ca39a211bf932cd4ed0b3
+X
+(data/weekFirstDay_setter_label_text.json,4\e\4e3c4e98329765f55aa7bed71de80bb83096712f
+\
+,data/onlyShowCrazyDay_setter_label_text.json,0\c\0cb7c313638989927a79f5d26b66471575218462
+T
+$data/crazyDay_setter_label_text.json,2\1\2153925217dfd1e97d7ef45ac1038d776d803341
+U
+%data/weekStyle_setter_label_text.json,f\0\f08acf0a72a98e140e245ff065e28ac59c7873b8

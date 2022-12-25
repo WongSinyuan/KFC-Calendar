@@ -20,7 +20,7 @@ from PySide2.QtWidgets import *
 
 from ui_calendar import Ui_MainWindow
 
-CrazyDay: int = 3
+crazyDay: int = 3
 """你的疯狂星期四，又何必是星期四？（0 表示星期一，6 表示星期天）"""
 onlyShowCrazyDay: bool = True
 """是否只显示疯狂星期四"""
@@ -112,8 +112,8 @@ def getFuture(today: datetime.datetime) -> int:
     :param today: 本日日期
     :return: 距离
     """
-    days = 6 - today.weekday() + CrazyDay + 1
-    return days if days < 7 else CrazyDay - today.weekday()
+    days = 6 - today.weekday() + crazyDay + 1
+    return days if days < 7 else crazyDay - today.weekday()
 
 
 def getPast(today: datetime.datetime) -> int:
@@ -123,7 +123,7 @@ def getPast(today: datetime.datetime) -> int:
     :param today: 本日日期
     :return: 距离
     """
-    days = today.weekday() + 6 - CrazyDay if today.weekday() - CrazyDay < 1 else today.weekday() - CrazyDay
+    days = today.weekday() + 6 - crazyDay if today.weekday() - crazyDay < 1 else today.weekday() - crazyDay
     return days if days != 6 else 0
 
 
@@ -151,6 +151,26 @@ def getIndexFromDate(date: datetime.datetime = None,
     return days, date.weekday() - weekFirstDay
 
 
+def QDateToDateTime(date: QDate) -> datetime.datetime:
+    """
+    将QDate转化为datetime
+
+    :param date: 日期
+    :return: 对应的日期
+    """
+    return datetime.datetime(date.year(), date.month(), date.day())
+
+
+def DateTimeToQDate(date: datetime.datetime) -> QDate:
+    """
+    将datetime转化为QDate
+
+    :param date: 日期
+    :return: 对应的日期
+    """
+    return QDate(date.year, date.month, date.day)
+
+
 class Calendar(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
@@ -166,6 +186,14 @@ class Calendar(QMainWindow, Ui_MainWindow):
                                                               {"self": self}) for y in range(7)] for x in range(6)]
         self.label_week: list[QLabel] = [eval("self.week_{}".format(i), {'self': self}) for i in range(7)]
         self.local_time = datetime.datetime.today()
+        self.dateEdit_label = {
+            self.date_delta_beginning_setter: self.date_delta_beginning_crazyDay_label,
+            self.date_delta_ending_setter: self.date_delta_ending_crazyDay_label,
+            self.date_add_sub_begining_setter: self.date_add_sub_begining_crazyDay_label,
+            self.date_add_sub_ending_shower: self.date_add_sub_ending_crazyDay_label,
+            self.crazyDay_beginning_setter: self.crazyDay_beginning_crazyDay_label,
+            self.crazyDay_ending_setter: self.crazyDay_ending_crazyDay_label,
+        }
         self.label_nowtime.setText(
             self.now_time.strftime(
                 "公元%Y年 %m月%d日 {} %H:%M:%S".format(weekStyle[weekStyleIndex][self.now_time.weekday()])
@@ -183,6 +211,30 @@ class Calendar(QMainWindow, Ui_MainWindow):
 
         self.main_widget.setCurrentIndex(0)
 
+        self.date_delta_beginning_setter.setDate(DateTimeToQDate(self.local_time))
+        self.date_delta_beginning_setter.setMaximumDate(DateTimeToQDate(self.local_time))
+        self.date_delta_ending_setter.setDate(DateTimeToQDate(self.local_time))
+        self.date_delta_ending_setter.setMinimumDate(DateTimeToQDate(self.local_time))
+        self.calculateDateDelta()
+
+        self.date_add_sub_begining_setter.setDate(DateTimeToQDate(self.local_time))
+        self.date_add_sub_delta_day_setter.setValue(0)
+        self.calculateAddSurDate()
+
+        self.crazyDay_beginning_setter.setDate(DateTimeToQDate(self.local_time))
+        self.crazyDay_beginning_setter.setMaximumDate(DateTimeToQDate(self.local_time))
+        self.crazyDay_ending_setter.setDate(DateTimeToQDate(self.local_time))
+        self.crazyDay_ending_setter.setMinimumDate(DateTimeToQDate(self.local_time))
+        self.calculateCrazyDay()
+
+    def setupQSS(self):
+        """
+        初始化QSS
+
+        :return: None
+        """
+        self.tab_calculte_scrollArea.widget().setStyleSheet("background-color: rgb(249, 249, 249)")
+
     @property
     def now_time(self):
         """
@@ -191,13 +243,6 @@ class Calendar(QMainWindow, Ui_MainWindow):
         :return: 返回当前时间
         """
         return datetime.datetime.today()
-
-    def setupQSS(self):
-        """
-        初始化QSS
-
-        :return: None
-        """
 
     def connectWidget(self):
         """
@@ -277,104 +322,14 @@ class Calendar(QMainWindow, Ui_MainWindow):
 
         self.weekFirstDay_setter.currentIndexChanged.connect(self.setWeekFirstDay)
 
-    def updateCalender(self):
-        """
-        更新当前日历显示
+        self.date_delta_beginning_setter.dateChanged.connect(self.calculateDateDelta)
+        self.date_delta_ending_setter.dateChanged.connect(self.calculateDateDelta)
 
-        :return: None
-        """
-        weeks = 0
-        flag = 0
+        self.date_add_sub_begining_setter.dateChanged.connect(self.calculateAddSurDate)
+        self.date_add_sub_delta_day_setter.valueChanged.connect(self.calculateAddSurDate)
 
-        self.updateWeekStyle()
-        self.resetFocus()
-
-        # 上月日历
-        days = getDays(year=self.get_year(), month=self.get_month() - 1)
-        weekday = getDateTime(self.get_year(), self.get_month() - 1, days).weekday()
-        _f = days - weekday - 1 + (weekFirstDay if weekday + 1 >= weekFirstDay else (weekFirstDay - 7))
-        for i in range(_f, days):
-            flag += 1
-            weekday = getDateTime(self.get_year(), self.get_month() - 1, i + 1).weekday()
-            button = self.label_calendar[weeks][weekday - weekFirstDay]
-            button.setText(["", str(i + 1)][any([weekday == CrazyDay, not onlyShowCrazyDay])])
-            button.setProperty("toMonth", False)
-            button.setProperty("Month", getDateTime(self.get_year(), self.get_month() - 1, 1).month)
-            button.setProperty("Year", getDateTime(self.get_year(), self.get_month() - 1, 1).year)
-
-            button.setStyleSheet(button.styleSheet())
-
-            weeks += int(weekday == (6 if weekFirstDay == 0 else weekFirstDay - 1))
-
-        # 本月日历
-        days = getDays(year=self.get_year(), month=self.get_month())
-        for i in range(days):
-            flag += 1
-            weekday = datetime.datetime(self.get_year(), self.get_month(), i + 1).weekday()
-            button = self.label_calendar[weeks][weekday - weekFirstDay]
-            button.setText(["", str(i + 1)][any([weekday == CrazyDay, not onlyShowCrazyDay])])
-            button.setProperty("toMonth", True)
-            button.setProperty("Month", getDateTime(self.get_year(), self.get_month() + 1, 1).month)
-            button.setProperty("Year", getDateTime(self.get_year(), self.get_month() + 1, 1).year)
-            button.setProperty("toDay",
-                               datetime.datetime(self.get_year(),
-                                                 self.get_month(), i + 1).date() == datetime.datetime.today().date())
-
-            button.setStyleSheet(button.styleSheet())
-
-            weeks += int(weekday == (6 if weekFirstDay == 0 else weekFirstDay - 1))
-
-        # 下月日历
-        for i in range(42 - flag):
-            weekday = getDateTime(self.get_year(), self.get_month() + 1, i + 1).weekday()
-            button = self.label_calendar[weeks][weekday - weekFirstDay]
-            button.setText(["", str(i + 1)][any([weekday == CrazyDay, not onlyShowCrazyDay])])
-            button.setProperty("toMonth", False)
-            button.setProperty("Month", getDateTime(self.get_year(), self.get_month() + 1, 1).month)
-            button.setProperty("Year", getDateTime(self.get_year(), self.get_month() + 1, 1).year)
-            button.setStyleSheet(button.styleSheet())
-            weeks += int(weekday == (6 if weekFirstDay == 0 else weekFirstDay - 1))
-
-    def updateWeekStyle(self):
-        """
-        更新星期显示
-
-        :return:
-        """
-        self.setFuturePast()
-        self.weekFirstDay_setter_label.setText(
-            json.load(open("data/weekFirstDay_setter_label_text.json", encoding="utf-8"))[weekStyleIndex])
-        self.crazyDay_setter_label.setText(
-            json.load(open("data/crazyDay_setter_label_text.json", encoding="utf-8"))[weekStyleIndex])
-        self.onlyShowCrazyDay_setter_label.setText(
-            json.load(
-                open("data/onlyShowCrazyDay_setter_label_text.json", encoding="utf-8")
-            )[weekStyleIndex].format(weekStyle[weekStyleIndex][CrazyDay]))
-        self.weekStyle_setter_label.setText(
-            json.load(open("data/weekStyle_setter_label_text.json", encoding="utf-8"))[weekStyleIndex])
-        for i in range(7):
-            label = self.label_week[i - weekFirstDay]
-            label.setText(weekStyle[weekStyleIndex][i])
-            label.setProperty("isWeekEnd", i == 5 or i == 6)
-            label.setStyleSheet(label.styleSheet())
-            self.weekFirstDay_setter.setItemText(i, weekStyle[weekStyleIndex][i])
-            self.crazyDay_setter.setItemText(i, weekStyle[weekStyleIndex][i])
-
-    def get_year(self) -> int:
-        """
-        获取当前年份
-
-        :return: 年
-        """
-        return self.year_edit.value()
-
-    def get_month(self) -> int:
-        """
-        获取当前月份
-
-        :return: 月
-        """
-        return self.month_edit.value()
+        self.crazyDay_beginning_setter.dateChanged.connect(self.calculateCrazyDay)
+        self.crazyDay_ending_setter.dateChanged.connect(self.calculateCrazyDay)
 
     def updateLocalTime(self):
         """
@@ -395,17 +350,156 @@ class Calendar(QMainWindow, Ui_MainWindow):
 
             self.local_time = self.now_time
 
+    def updateCalender(self):
+        """
+        更新当前日历显示
+
+        :return: None
+        """
+        weeks = 0
+        flag = 0
+
+        self.updateWeekStyle()
+        self.resetFocus()
+
+        # 上月日历
+        days = getDays(year=self.get_year(), month=self.get_month() - 1)
+        weekday = getDateTime(self.get_year(), self.get_month() - 1, days).weekday()
+        _f = days - weekday - 1 + (weekFirstDay if weekday + 1 >= weekFirstDay else (weekFirstDay - 7))
+        for i in range(_f, days):
+            flag += 1
+            weekday = getDateTime(self.get_year(), self.get_month() - 1, i + 1).weekday()
+            button = self.label_calendar[weeks][weekday - weekFirstDay]
+            button.setText(["", str(i + 1)][any([weekday == crazyDay, not onlyShowCrazyDay])])
+            button.setProperty("toMonth", False)
+            button.setProperty("Month", getDateTime(self.get_year(), self.get_month() - 1, 1).month)
+            button.setProperty("Year", getDateTime(self.get_year(), self.get_month() - 1, 1).year)
+
+            button.setStyleSheet(button.styleSheet())
+
+            weeks += int(weekday == (6 if weekFirstDay == 0 else weekFirstDay - 1))
+
+        # 本月日历
+        days = getDays(year=self.get_year(), month=self.get_month())
+        for i in range(days):
+            flag += 1
+            weekday = datetime.datetime(self.get_year(), self.get_month(), i + 1).weekday()
+            button = self.label_calendar[weeks][weekday - weekFirstDay]
+            button.setText(["", str(i + 1)][any([weekday == crazyDay, not onlyShowCrazyDay])])
+            button.setProperty("toMonth", True)
+            button.setProperty("Month", getDateTime(self.get_year(), self.get_month() + 1, 1).month)
+            button.setProperty("Year", getDateTime(self.get_year(), self.get_month() + 1, 1).year)
+            button.setProperty("toDay",
+                               datetime.datetime(self.get_year(),
+                                                 self.get_month(), i + 1).date() == datetime.datetime.today().date())
+
+            button.setStyleSheet(button.styleSheet())
+
+            weeks += int(weekday == (6 if weekFirstDay == 0 else weekFirstDay - 1))
+
+        # 下月日历
+        for i in range(42 - flag):
+            weekday = getDateTime(self.get_year(), self.get_month() + 1, i + 1).weekday()
+            button = self.label_calendar[weeks][weekday - weekFirstDay]
+            button.setText(["", str(i + 1)][any([weekday == crazyDay, not onlyShowCrazyDay])])
+            button.setProperty("toMonth", False)
+            button.setProperty("Month", getDateTime(self.get_year(), self.get_month() + 1, 1).month)
+            button.setProperty("Year", getDateTime(self.get_year(), self.get_month() + 1, 1).year)
+            button.setStyleSheet(button.styleSheet())
+            weeks += int(weekday == (6 if weekFirstDay == 0 else weekFirstDay - 1))
+
+    def updateWeekStyle(self):
+        """
+        更新星期显示
+
+        :return:
+        """
+        self.setFuturePast()
+        self.updateDateEditTip()
+        self.weekFirstDay_setter_label.setText(
+            json.load(open("data/weekFirstDay_setter_label_text.json", encoding="utf-8"))[weekStyleIndex])
+        self.crazyDay_setter_label.setText(
+            json.load(open("data/crazyDay_setter_label_text.json", encoding="utf-8"))[weekStyleIndex])
+        self.onlyShowCrazyDay_setter_label.setText(
+            json.load(
+                open("data/onlyShowCrazyDay_setter_label_text.json", encoding="utf-8")
+            )[weekStyleIndex].format(weekStyle[weekStyleIndex][crazyDay]))
+        self.weekStyle_setter_label.setText(
+            json.load(open("data/weekStyle_setter_label_text.json", encoding="utf-8"))[weekStyleIndex])
+        self.crazyDay_result_label.setText("疯狂{}天数".format(weekStyle[weekStyleIndex][crazyDay]))
+        self.crazyDay_title_label.setText("日期之间的疯狂{}".format(weekStyle[weekStyleIndex][crazyDay]))
+        for i in range(7):
+            label = self.label_week[i - weekFirstDay]
+            label.setText(weekStyle[weekStyleIndex][i])
+            label.setProperty("isWeekEnd", i == 5 or i == 6)
+            label.setStyleSheet(label.styleSheet())
+            self.weekFirstDay_setter.setItemText(i, weekStyle[weekStyleIndex][i])
+            self.crazyDay_setter.setItemText(i, weekStyle[weekStyleIndex][i])
+
+    def updateDateEditTip(self):
+        """
+        更新dateEdit旁边的小提示
+
+        :return: None
+        """
+        for edit, label in zip(self.dateEdit_label.keys(), self.dateEdit_label.values()):
+            label.setText("这天是疯狂{}！！".format(weekStyle[weekStyleIndex][crazyDay]))
+            label.setVisible(QDateToDateTime(edit.date()).weekday() == crazyDay)
+
+    def calculateDateDelta(self):
+        """
+        计算时间差值，并更新显示
+
+        :return: None
+        """
+
+        date1 = QDateToDateTime(self.date_delta_beginning_setter.date())
+        date2 = QDateToDateTime(self.date_delta_ending_setter.date())
+        self.date_delta_beginning_setter.setMaximumDate(self.date_delta_ending_setter.date())
+        self.date_delta_ending_setter.setMinimumDate(self.date_delta_beginning_setter.date())
+        delta = date2 - date1
+        self.date_delta_result_shower.setValue(delta.days)
+        self.updateDateEditTip()
+
+    def calculateAddSurDate(self):
+        """
+        计算增减天数后的日期，并更新显示
+
+        :return: None
+        """
+        date1 = self.date_add_sub_begining_setter.date()
+        days = self.date_add_sub_delta_day_setter.value()
+        date2 = date1.addDays(days)
+        self.date_add_sub_ending_shower.setDate(date2)
+        self.updateDateEditTip()
+
+    def calculateCrazyDay(self):
+        """
+        计算日期之间有多少疯狂日，并更新显示
+
+        :return: None
+        """
+        date1 = QDateToDateTime(self.crazyDay_beginning_setter.date())
+        self.crazyDay_ending_setter.setMinimumDate(self.crazyDay_beginning_setter.date())
+        date2 = QDateToDateTime(self.crazyDay_ending_setter.date())
+        self.crazyDay_beginning_setter.setMaximumDate(self.crazyDay_ending_setter.date())
+
+        days = (date2 - date1).days - (6 - date1.weekday()) - date2.weekday() - 1
+        nums = days // 7 + int(date1.weekday() <= crazyDay) + int(date2.weekday() >= crazyDay)
+        self.crazyDay_result_shower.setValue(nums)
+        self.updateDateEditTip()
+
     def setFuturePast(self):
         """
         设置过去和未来
 
         :return: None
         """
-        if self.now_time.weekday() != CrazyDay:
+        if self.now_time.weekday() != crazyDay:
             self.label_future.setText(
-                f"展望未来：还有{getFuture(self.now_time)}天到下一个疯狂{weekStyle[weekStyleIndex][CrazyDay]}")
+                f"展望未来：还有{getFuture(self.now_time)}天到下一个疯狂{weekStyle[weekStyleIndex][crazyDay]}")
             self.label_past.setText(
-                f"回首过去：距离上个疯狂{weekStyle[weekStyleIndex][CrazyDay]}已经过了{getPast(self.now_time)}天")
+                f"回首过去：距离上个疯狂{weekStyle[weekStyleIndex][crazyDay]}已经过了{getPast(self.now_time)}天")
         else:
             self.label_past.setText("回首过去：逝者如斯夫，要珍惜当下")
             self.label_future.setText("展望未来：未来仍然遥远，要把握今朝")
@@ -443,10 +537,12 @@ class Calendar(QMainWindow, Ui_MainWindow):
         :param value: 值（0<=value<=6）
         :return: None
         """
-        global CrazyDay
+        global crazyDay
         if 0 <= value <= 6:
-            CrazyDay = value
+            crazyDay = value
             self.updateCalender()
+            self.calculateCrazyDay()
+            self.updateDateEditTip()
             self.setFuturePast()
         else:
             raise ValueError("应在区间[0, 6]内")
@@ -459,11 +555,27 @@ class Calendar(QMainWindow, Ui_MainWindow):
         :return: None
         """
         global weekStyleIndex
-        if 0 <= value:
+        if 0 <= value <= len(weekStyle):
             weekStyleIndex = value
             self.updateCalender()
         else:
-            raise ValueError("应在之间[0, 1]之间")
+            raise ValueError("应在之间[0, {}]之间".format(len(weekStyle)))
+
+    def get_year(self) -> int:
+        """
+        获取当前年份
+
+        :return: 年
+        """
+        return self.year_edit.value()
+
+    def get_month(self) -> int:
+        """
+        获取当前月份
+
+        :return: 月
+        """
+        return self.month_edit.value()
 
     def getButtonFromDate(self,
                           date: datetime.datetime | None = None,
